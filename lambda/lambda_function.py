@@ -26,6 +26,36 @@ def build_validation_result(is_valid, violated_slot, message_content):
         "message": {"contentType": "PlainText", "content": message_content},
     }
 
+def validate_data(age, investment_amount, intent_request):
+    """
+    Validates the data provided by the user.
+    """
+
+    # Validate the age range.
+    if age is not None:
+        age = parse_int(age)
+        if age < 1 or age > 64:
+            return build_validation_result(
+                False,
+                "age",
+                "Sorry, the age provide is outside of the supported range. "
+                "This service is designed for individuals between 1 and 64.",
+            )
+
+    # Validate the investment amount.
+    if investment_amount is not None:
+        investment_amount = parse_int(investment_amount)
+        if investment_amount < 5000:
+            return build_validation_result(
+                False,
+                "investment_amount",
+                "Sorry, This service requires a minimum investing amount of at least $5,000."
+                "Please provide an investment amount of $5,000 or more.",
+            )
+
+    # A True result is returned if age or investment_amount are valid.
+    return build_validation_result(True, None, None)
+
 
 ### Dialog Actions Helper Functions ###
 def get_slots(intent_request):
@@ -124,29 +154,69 @@ def recommend_portfolio(intent_request):
     Performs dialog management and fulfillment for recommending a portfolio.
     """
 
+    # Get the value of each slot.
     first_name = get_slots(intent_request)["firstName"]
     age = get_slots(intent_request)["age"]
     investment_amount = get_slots(intent_request)["investmentAmount"]
-    risk_level = get_slots(intent_request)["riskLevel"]
+    risk_level = get_slots(intent_request)["riskLevel"].lower()
+
+    # Gets the invocation source, for Lex dialogs "DialogCodeHook" is expected.
     source = intent_request["invocationSource"]
 
-    # Validate the age range.
-    if age < 1 or age > 64:
-        return build_validation_result(
-            False,
-            "age",
-            "Sorry, the age provide is outside of the supported range. "
-            "This service is designed for individuals between 1 and 64.",
-        )
+    if source == "DialogCodeHook":
+        # This code performs basic validation on the supplied input slots.
 
-    # Validate the investment amount.
-    if investment_amount < 5000:
-        return build_validation_result(
-            False,
-            "investment_amount",
-            "Sorry, This service requires a minimum investing amount of at least $5,000."
-            "Please provide an investment amount of $5,000 or more.",
-        )
+        # Get all the slots.
+        slots = get_slots(intent_request)
+
+        # Validates the user's input using the validate_data function.
+        validation_result = validate_data(age, investment_amount, intent_request)
+
+        # If the data provided by the user is not valid, the elicitSlot
+        # dialog action is used to re-prompt for the first violation detected.
+        if not validation_result["isValid"]:
+            slots[validation_result["violatedSlot"]] = None  # Cleans invalid slot
+
+            # Returns an elicitSlot dialog to request new data for the invalid slot
+            return elicit_slot(
+                intent_request["sessionAttributes"],
+                intent_request["currentIntent"]["name"],
+                slots,
+                validation_result["violatedSlot"],
+                validation_result["message"],
+            )
+
+        # Fetch current session attributes
+        output_session_attributes = intent_request["sessionAttributes"]
+
+        # Once all slots are valid, a delegate dialog is returned to Lex to choose the next course of action.
+        return delegate(output_session_attributes, get_slots(intent_request))
+
+    # Recommend a portfolio based on the value of risk_level.
+    portfolio = "{}% bonds (AGG), {}% equities (SPY)"
+    if risk_level == "high":
+        portfolio = portfolio.format(20, 80)
+    elif risk_level == "medium":
+        portfolio = portfolio.format(40, 60)
+    elif risk_level == "low":
+        portfolio = portfolio.format(60, 40)
+    else:
+        portfolio = portfolio.format(100, 0)
+
+    # Return a message with conversion's result.
+    return close(
+        intent_request["sessionAttributes"],
+        "Fulfilled",
+        {
+            "contentType": "PlainText",
+            "content": """Thank you for your information;
+            based on the level of risk that you would like to take
+            we recommend a portfolio of {}.
+            """.format(
+                portfolio
+            ),
+        },
+    )
 
 
 ### Intents Dispatcher ###
