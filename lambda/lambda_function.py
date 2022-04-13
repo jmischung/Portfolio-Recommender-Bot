@@ -26,6 +26,7 @@ def build_validation_result(is_valid, violated_slot, message_content):
         "message": {"contentType": "PlainText", "content": message_content},
     }
 
+
 def validate_data(age, investment_amount, intent_request):
     """
     Validates the data provided by the user.
@@ -48,8 +49,8 @@ def validate_data(age, investment_amount, intent_request):
         if investment_amount < 5000:
             return build_validation_result(
                 False,
-                "investment_amount",
-                "Sorry, This service requires a minimum investing amount of at least $5,000."
+                "investmentAmount",
+                "Sorry, This service requires a minimum investing amount of at least $5,000. "
                 "Please provide an investment amount of $5,000 or more.",
             )
 
@@ -110,17 +111,48 @@ def close(session_attributes, fulfillment_state, message):
     return response
 
 
+"""
+Step 3: Enhance the Robo Advisor with an Amazon Lambda Function
+
+In this section, you will create an Amazon Lambda function that will validate the data provided by the user on the Robo Advisor.
+
+1. Start by creating a new Lambda function from scratch and name it `recommendPortfolio`. Select Python 3.7 as runtime.
+
+2. In the Lambda function code editor, continue by deleting the AWS generated default lines of code, then paste in the starter code provided in `lambda_function.py`.
+
+3. Complete the `recommend_portfolio()` function by adding these validation rules:
+
+    * The `age` should be greater than zero and less than 65.
+    * The `investment_amount` should be equal to or greater than 5000.
+
+4. Once the intent is fulfilled, the bot should respond with an investment recommendation based on the selected risk level as follows:
+
+    * **none:** "100% bonds (AGG), 0% equities (SPY)"
+    * **low:** "60% bonds (AGG), 40% equities (SPY)"
+    * **medium:** "40% bonds (AGG), 60% equities (SPY)"
+    * **high:** "20% bonds (AGG), 80% equities (SPY)"
+
+> **Hint:** Be creative while coding your solution, you can have all the code on the `recommend_portfolio()` function, or you can split the functionality across different functions, put your Python coding skills in action!
+
+5. Once you finish coding your Lambda function, test it using the sample test events provided for this Challenge.
+
+6. After successfully testing your code, open the Amazon Lex Console and navigate to the `recommendPortfolio` bot configuration, integrate your new Lambda function by selecting it in the “Lambda initialization and validation” and “Fulfillment” sections.
+
+7. Build your bot, and test it with valid and invalid data for the slots.
+
+"""
+
+
 ### Intents Handlers ###
 def recommend_portfolio(intent_request):
     """
     Performs dialog management and fulfillment for recommending a portfolio.
     """
 
-    # Get the value of each slot.
     first_name = get_slots(intent_request)["firstName"]
     age = get_slots(intent_request)["age"]
     investment_amount = get_slots(intent_request)["investmentAmount"]
-    risk_level = get_slots(intent_request)["riskLevel"].lower()
+    risk_level = get_slots(intent_request)["riskLevel"]
 
     # Gets the invocation source, for Lex dialogs "DialogCodeHook" is expected.
     source = intent_request["invocationSource"]
@@ -156,11 +188,11 @@ def recommend_portfolio(intent_request):
 
     # Recommend a portfolio based on the value of risk_level.
     portfolio = "{}% bonds (AGG), {}% equities (SPY)"
-    if risk_level == "high":
+    if risk_level == "High":
         portfolio = portfolio.format(20, 80)
-    elif risk_level == "medium":
+    elif risk_level == "Medium":
         portfolio = portfolio.format(40, 60)
-    elif risk_level == "low":
+    elif risk_level == "Low":
         portfolio = portfolio.format(60, 40)
     else:
         portfolio = portfolio.format(100, 0)
